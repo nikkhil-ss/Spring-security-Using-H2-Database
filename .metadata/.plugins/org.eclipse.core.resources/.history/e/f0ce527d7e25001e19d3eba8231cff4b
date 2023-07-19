@@ -1,0 +1,80 @@
+package com.example.demo.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
+import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.jdbc.JdbcDaoImpl;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.provisioning.JdbcUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+
+import static org.springframework.security.config.Customizer.withDefaults;
+
+import javax.sql.DataSource;
+
+@EnableWebSecurity
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfiguration {
+
+	@Bean
+	EmbeddedDatabase datasource() {
+		return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).setName("logindetails")
+				.addScript(JdbcDaoImpl.DEFAULT_USER_SCHEMA_DDL_LOCATION).build();
+	}
+
+//	@Bean
+//	public InMemoryUserDetailsManager userDetailsService() {
+//		UserDetails user = User.withDefaultPasswordEncoder().username("student").password("student").roles("STUDENT").build();
+//
+//		UserDetails user2 = User.withDefaultPasswordEncoder().username("management").password("12345").roles("MANAGEMENT")
+//				.build();
+//		return new InMemoryUserDetailsManager(user, user2);
+//	}
+
+	@Bean
+	JdbcUserDetailsManager userDetails(DataSource datasource, PasswordEncoder encoder) {
+
+		UserDetails admin = User.builder()
+				.username("admin")
+//				.password("password")
+				.password(encoder.encode("hello"))
+				.roles("ADMIN")
+				.build();
+
+		JdbcUserDetailsManager jdbc = new JdbcUserDetailsManager(datasource);
+		jdbc.createUser(admin);
+		return jdbc;
+	}
+
+	@SuppressWarnings({ "deprecation" })
+	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		http.csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+				.authorizeRequests(auth -> auth.requestMatchers("/h2-console/**").hasRole("ADMIN")
+                 .anyRequest().authenticated()
+				).headers(headers -> headers.frameOptions().sameOrigin()).formLogin(withDefaults());
+
+		http.logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/").invalidateHttpSession(true)
+				.deleteCookies("JSESSIONID").permitAll());
+//		http.csrf().disable();
+		return http.build();
+	}
+	
+	 @Bean
+	    PasswordEncoder passwordEncoder() {
+	        return new BCryptPasswordEncoder();
+	    }
+
+}

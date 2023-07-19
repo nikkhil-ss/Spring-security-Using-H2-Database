@@ -1,0 +1,42 @@
+package com.example.demo.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+
+import static org.springframework.security.config.Customizer.withDefaults;
+
+@EnableWebSecurity
+@Configuration
+public class SecurityConfiguration {
+	@Bean
+	public InMemoryUserDetailsManager userDetailsService() {
+		UserDetails user = User.withDefaultPasswordEncoder().username("student").password("student").roles("STUDENT").build();
+
+		UserDetails user2 = User.withDefaultPasswordEncoder().username("admin").password("admin").roles("MANAGEMENT")
+				.build();
+		return new InMemoryUserDetailsManager(user, user2);
+	}
+
+	@SuppressWarnings("deprecation")
+	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		http.csrf(withDefaults())
+				.authorizeHttpRequests(requests -> requests.requestMatchers("/AdminPage").hasRole("ADMIN")
+						.requestMatchers("/UserPage").hasRole("USER").requestMatchers("/book").permitAll()
+						.requestMatchers("/**","/","home").permitAll())
+				.formLogin(withDefaults());
+
+		http.logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/").invalidateHttpSession(true)
+				.deleteCookies("JSESSIONID").permitAll());
+		http.csrf().disable();
+		return http.build();
+	}
+
+}
